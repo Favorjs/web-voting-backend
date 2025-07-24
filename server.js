@@ -569,6 +569,55 @@ app.post('/api/login',   async (req, res) => {
   }
 }); // Close /api/login route properly
 
+// ---------------------------------------------------
+// Endpoint: Register a new shareholder / voter
+// POST /api/admin/registered-users
+// Expects JSON body with at minimum { name, acno }
+// Optional: holdings, chn, email, phone_number
+// ---------------------------------------------------
+app.post('/api/admin/registered-users', async (req, res) => {
+  try {
+    const { name, acno, holdings = 0, chn, email, phone_number } = req.body;
+
+    // Basic validation
+    if (!name || !acno) {
+      return res.status(400).json({ error: 'Name and account number (acno) are required' });
+    }
+
+    // Normalize email if provided
+    const normalizedEmail = email ? email.toLowerCase() : null;
+
+    // Prevent duplicates by account number or email
+    const existing = await RegisteredUser.findOne({
+      where: {
+        [Op.or]: [
+          { acno },
+          normalizedEmail ? { email: normalizedEmail } : null
+        ].filter(Boolean)
+      }
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: 'A user with the same account number or email already exists' });
+    }
+
+    // Create the user
+    const newUser = await RegisteredUser.create({
+      name,
+      acno,
+      holdings,
+      chn,
+      email: normalizedEmail,
+      phone_number
+    });
+
+    return res.status(201).json({ success: true, data: newUser });
+  } catch (error) {
+    console.error('Error registering user:', error);
+    return res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
  // Get all resolutions with vote counts
  app.get('/api/resolutions', async (req, res) => {
   try {
