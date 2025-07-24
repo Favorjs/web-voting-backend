@@ -135,6 +135,9 @@ const sequelize = process.env.DATABASE_URL
   createTableIfMissing: true,
   pruneSessionInterval: 60 // seconds
 });
+
+// Trust the first proxy hop (Railway edge) so secure cookies are sent
+app.set('trust proxy', 1);
   
   app.use(session({
     key: 'session_cookie_name',
@@ -448,9 +451,9 @@ app.use(express.static('public'));
 // });
 
 app.use(cors({
-  origin: ['vote.apel.com.ng','localhost:5173'], // Vite default port
+  origin: ['https://vote.apel.com.ng','localhost:5173'], // Vite default port
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 // Routes
