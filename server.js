@@ -464,7 +464,7 @@ app.post('/api/admin/agm/end', (req, res) => {
 });
 
 // Authentication routes
-app.post('/api/login', async (req, res) => {
+app.post('/api/login',  requireAuth, async (req, res) => {
   const { identifier } = req.body;
   
   try {
