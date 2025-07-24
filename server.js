@@ -948,10 +948,10 @@ app.get('/api/results/:id', async (req, res) => {
 });
 
 // Frontend routes
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/login.html');
+// app.get('/', (req, res) => {
+//   res.sendFile(__dirname + '/public/login.html');
   
-});
+// });
 
 app.get('/dashboard', (req, res) => {
   if (!req.session.userId) return res.redirect('/');
