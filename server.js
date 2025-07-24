@@ -144,8 +144,8 @@ const sequelize = process.env.DATABASE_URL
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // Set to true if using HTTPS
-      sameSite: 'lax',
+      secure: true, // Set to true if using HTTPS
+      sameSite: 'none',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
   }));
@@ -448,7 +448,7 @@ app.use(express.static('public'));
 // });
 
 app.use(cors({
-  origin: process.env.LIVE_FRONTEND2, // Vite default port
+  origin: ['vote.apel.com.ng','localhost:5173'], // Vite default port
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -557,7 +557,7 @@ app.post('/api/login',   async (req, res) => {
 }); // Close /api/login route properly
 
  // Get all resolutions with vote counts
- app.get('/api/resolutions',requireAuth, async (req, res) => {
+ app.get('/api/resolutions', async (req, res) => {
   try {
     // First get all resolutions without vote counts
     const resolutions = await Resolution.findAll({
