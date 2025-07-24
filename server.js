@@ -55,29 +55,49 @@ const io = new Server(server, {
 
 // Database setup (PostgreSQL)
 // PostgreSQL connection pool for session store
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'e-voting',
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-});
-
-const sequelize = new Sequelize(
-    process.env.DB_NAME || 'e-voting',
-    process.env.DB_USER || 'postgres',
-    process.env.DB_PASSWORD || '',
-    {
+// Build database configuration
+const pgConfig = process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
+    }
+  : {
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || '',
       host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'e-voting',
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+    };
+
+const pool = new Pool(pgConfig);
+
+const sequelize = process.env.DATABASE_URL
+  ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
+      protocol: 'postgres',
+      logging: false,
       dialectOptions: {
-        ssl: process.env.DB_SSL === 'true' ? {
+        ssl: process.env.DB_SSL === 'false' ? false : {
           require: true,
           rejectUnauthorized: false
-        } : false
-      },
-      logging: false,
+        }
+      }
+    })
+  : new Sequelize(
+      process.env.DB_NAME || 'e-voting',
+      process.env.DB_USER || 'postgres',
+      process.env.DB_PASSWORD || '',
+      {
+        host: process.env.DB_HOST || 'localhost',
+        dialect: 'postgres',
+        dialectOptions: {
+          ssl: process.env.DB_SSL === 'true' ? {
+            require: true,
+            rejectUnauthorized: false
+          } : false
+        },
+        logging: false,
     }
   );
   const sessionStore = new pgSession({
