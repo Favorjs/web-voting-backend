@@ -11,7 +11,7 @@ const app = express();
 
 // CORS middleware at the very top
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -46,12 +46,10 @@ const requireAuth = (req, res, next) => {
 };
 // Allowed origins for CORS
 const allowedOrigins = [
-  'http://localhost:5173',
-process.env.LIVE_FRONTEND1,
-process.env.LIVE_FRONTEND2,
-
-];
-
+  process.env.LOCAL_FRONTEND,
+  process.env.LIVE_FRONTEND1,
+  process.env.LIVE_FRONTEND2 // Add your new domain here
+].filter(Boolean);
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
