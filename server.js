@@ -479,8 +479,15 @@ app.post('/api/login',   async (req, res) => {
     const emailRegex = /^[\w.-]+@[\w.-]+\.[A-Za-z]{2,}$/;
 
     if (emailRegex.test(identifier)) {
+      const identifierLower = identifier.toLowerCase();
       // Login by email
-      user = await RegisteredUser.findOne({ where: { email: identifier } });
+            // Perform case-insensitive lookup by lowering both sides
+      user = await RegisteredUser.findOne({
+        where: Sequelize.where(
+          Sequelize.fn('lower', Sequelize.col('email')),
+          identifierLower
+        )
+      });
     } else {
       // Treat as phone number, build possible variants
       const digitsOnly = String(identifier).replace(/\D/g, '');
