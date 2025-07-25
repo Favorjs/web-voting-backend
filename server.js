@@ -1575,22 +1575,31 @@ app.post('/api/audit-vote', requireAuth, async (req, res) => {
     }
     const userId = req.session.userId;
 
-    // Check if user has already voted
-    const existingVote = await AuditVote.findOne({
-      where: { 
-        voterId: userId,
-        '$AuditCommittee.isActive$': true
-      },
+    // Check how many audit votes the user has already cast in the current election
+    const voteCount = await AuditVote.count({
+      where: { voterId: userId },
       include: [{
         model: AuditCommittee,
-        attributes: []
+        attributes: [],
+        where: { isActive: true }
       }],
+      transaction
+    });
+
+    if (voteCount >= 3) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'You have reached the maximum of 3 votes for the audit committee election' });
+    }
+
+    // Prevent duplicate vote for the same committee member
+    const existingVote = await AuditVote.findOne({
+      where: { voterId: userId, AuditCommitteeId: committeeId },
       transaction
     });
 
     if (existingVote) {
       await transaction.rollback();
-      return res.status(400).json({ error: 'You have already voted in this election' });
+      return res.status(400).json({ error: 'You have already voted for this candidate' });
     }
 
     // Create vote
