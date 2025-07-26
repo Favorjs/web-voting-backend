@@ -1564,7 +1564,7 @@ app.get('/api/active-resolution', async (req, res) => {
   }
 });
 
-// Submit audit vote
+// Submit audit vote (max 3 per user)
 app.post('/api/audit-vote', requireAuth, async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -1575,31 +1575,30 @@ app.post('/api/audit-vote', requireAuth, async (req, res) => {
     }
     const userId = req.session.userId;
 
-    // Check how many audit votes the user has already cast in the current election
-    const voteCount = await AuditVote.count({
-      where: { voterId: userId },
-      include: [{
-        model: AuditCommittee,
-        attributes: [],
-        where: { isActive: true }
-      }],
-      transaction
-    });
+    // Count total audit votes cast by this user so far
+    const voteCount = await AuditVote.count({ where: { voterId: userId } });
 
     if (voteCount >= 3) {
       await transaction.rollback();
-      return res.status(400).json({ error: 'You have reached the maximum of 3 votes for the audit committee election' });
+      return res.status(400).json({ error: 'You have voted 3 times, voting power exhausted' });
     }
 
-    // Prevent duplicate vote for the same committee member
+    // Check if user has already voted for this active member
     const existingVote = await AuditVote.findOne({
-      where: { voterId: userId, AuditCommitteeId: committeeId },
+      where: { 
+        voterId: userId,
+        '$AuditCommittee.isActive$': true
+      },
+      include: [{
+        model: AuditCommittee,
+        attributes: []
+      }],
       transaction
     });
 
     if (existingVote) {
       await transaction.rollback();
-      return res.status(400).json({ error: 'You have already voted for this candidate' });
+      return res.status(400).json({ error: 'You have already voted for this member' });
     }
 
     // Create vote
@@ -1696,16 +1695,23 @@ app.get('/api/check-vote', requireAuth, async (req, res) => {
   }
 });
 
-// Check if logged-in user has voted on the active audit committee election
+// Check audit vote status and remaining power
 app.get('/api/check-audit-vote', requireAuth, async (req, res) => {
   try {
     const active = await AuditCommittee.findOne({ where: { isActive: true } });
     if (!active) return res.json({ hasVoted: false });
 
+    // total votes across all audit committee members
+    const totalVotes = await AuditVote.count({ where: { voterId: req.session.userId } });
+
     const vote = await AuditVote.findOne({
       where: { voterId: req.session.userId, AuditCommitteeId: active.id }
     });
-    res.json({ hasVoted: !!vote });
+    res.json({ 
+      hasVoted: !!vote,
+      totalVotes,
+      exhausted: totalVotes >= 3
+    });
   } catch (err) {
     console.error('Error checking audit vote status:', err);
     res.status(500).json({ error: 'Failed to check audit vote status' });
