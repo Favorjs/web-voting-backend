@@ -1578,7 +1578,7 @@ app.post('/api/audit-vote', requireAuth, async (req, res) => {
     // Count total audit votes cast by this user so far
     const voteCount = await AuditVote.count({ where: { voterId: userId } });
 
-    if (voteCount > 3) {
+    if (voteCount >= 3) {
       await transaction.rollback();
       return res.status(400).json({ error: 'You have voted 3 times, voting power exhausted' });
     }
