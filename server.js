@@ -362,6 +362,11 @@ const setVotingState = (isOpen, type, activeId) => {
   io.emit('voting-state', votingState);
 };
 
+// Add endpoint to get current voting state
+app.get('/api/voting-state', (req, res) => {
+  res.json(votingState);
+});
+
 
 app.post('/api/admin/voting/open', (req, res) => {
   setVotingState(true);
