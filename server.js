@@ -47,7 +47,7 @@ const requireAuth = (req, res, next) => {
 // Allowed origins for CORS
 // Explicit list of domains allowed to hit both REST and Socket.IO endpoints
 const allowedOrigins = [
-  'https://vote.apel.com.ng',     // production front-end
+  'https://vote.apel.ng',     // production front-end
   'http://localhost:5173',        // local Vite dev server
   process.env.LOCAL_FRONTEND,
   process.env.LIVE_FRONTEND1,
@@ -459,7 +459,7 @@ app.use(express.static('public'));
 // });
 
 app.use(cors({
-  origin: ['https://vote.apel.com.ng','http://localhost:5173'], // Vite default port
+  origin: ['https://vote.apel.ng','http://localhost:5173'], // Vite default port
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
