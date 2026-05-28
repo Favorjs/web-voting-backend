@@ -1740,12 +1740,9 @@ app.get('/api/check-audit-vote', requireAuth, async (req, res) => {
 
 // ── Admin Auth ──────────────────────────────────────────────────────────────
 
-// POST /api/super-admin — one-time setup protected by SETUP_SECRET env var
+// POST /api/super-admin — create an admin account
 app.post('/api/super-admin', async (req, res) => {
-  const { secret, username, password } = req.body;
-  if (!process.env.SETUP_SECRET || secret !== process.env.SETUP_SECRET) {
-    return res.status(403).json({ error: 'Invalid setup secret' });
-  }
+  const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'username and password required' });
   }
