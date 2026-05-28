@@ -441,6 +441,12 @@ AuditCommittee.hasMany(AuditVote, { foreignKey: 'AuditCommitteeId' });
 AuditVote.belongsTo(AuditCommittee, { foreignKey: 'AuditCommitteeId' });
 AuditVote.belongsTo(RegisteredUser, { foreignKey: 'voterId' });
 RegisteredUser.hasMany(AuditVote, { foreignKey: 'voterId' });
+// Global key-value settings (proxy votes, proxy holdings, etc.)
+const Setting = sequelize.define('Setting', {
+  key: { type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true },
+  value: { type: Sequelize.TEXT, allowNull: false }
+}, { timestamps: false });
+
 // Admin model
 const Admin = sequelize.define('Admin', {
   id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
@@ -1813,6 +1819,38 @@ app.put('/api/admin/audit-committee/:id/deactivate', requireAdminAuth, async (re
     res.json(member);
   } catch (err) {
     res.status(500).json({ error: 'Failed to deactivate member' });
+  }
+});
+
+// ── Proxy Settings ───────────────────────────────────────────────────────────
+
+// GET /api/proxy-settings — public, used by results page
+app.get('/api/proxy-settings', async (req, res) => {
+  try {
+    const rows = await Setting.findAll({ where: { key: ['proxyVotes', 'proxyHoldings'] } });
+    const map = Object.fromEntries(rows.map(r => [r.key, Number(r.value)]));
+    res.json({
+      proxyVotes: map.proxyVotes ?? 0,
+      proxyHoldings: map.proxyHoldings ?? 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch proxy settings' });
+  }
+});
+
+// PUT /api/admin/proxy-settings — admin only
+app.put('/api/admin/proxy-settings', requireAdminAuth, async (req, res) => {
+  const { proxyVotes, proxyHoldings } = req.body;
+  if (typeof proxyVotes !== 'number' || typeof proxyHoldings !== 'number') {
+    return res.status(400).json({ error: 'proxyVotes and proxyHoldings must be numbers' });
+  }
+  try {
+    await Setting.upsert({ key: 'proxyVotes', value: String(proxyVotes) });
+    await Setting.upsert({ key: 'proxyHoldings', value: String(proxyHoldings) });
+    io.emit('proxy-settings-updated', { proxyVotes, proxyHoldings });
+    res.json({ success: true, proxyVotes, proxyHoldings });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save proxy settings' });
   }
 });
 
