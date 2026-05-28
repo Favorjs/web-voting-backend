@@ -44,6 +44,13 @@ const requireAuth = (req, res, next) => {
   }
   next();
 };
+
+const requireAdminAuth = (req, res, next) => {
+  if (!req.session?.adminId) {
+    return res.status(401).json({ success: false, error: 'Admin not authenticated' });
+  }
+  next();
+};
 // Allowed origins for CORS
 // Explicit list of domains allowed to hit both REST and Socket.IO endpoints
 const allowedOrigins = [
@@ -368,7 +375,7 @@ app.get('/api/voting-state', (req, res) => {
 });
 
 
-app.post('/api/admin/voting/open', (req, res) => {
+app.post('/api/admin/voting/open', requireAdminAuth, (req, res) => {
   setVotingState(true);
   io.emit('voting-toggle', true);
   res.json({ success: true   
@@ -382,7 +389,7 @@ app.get('/api/admin/voting/state', (req, res) => {
 });
 
 // Toggle voting state and broadcast to clients
-app.post('/api/admin/voting/toggle', (req, res) => {
+app.post('/api/admin/voting/toggle', requireAdminAuth, (req, res) => {
   const { type, activeId } = req.body;
   if (!type || !activeId) {
     return res.status(400).json({ error: 'type and activeId required' });
@@ -392,7 +399,7 @@ app.post('/api/admin/voting/toggle', (req, res) => {
   return res.json(votingState);
 });
 
-app.post('/api/admin/voting/close', (req, res) => {
+app.post('/api/admin/voting/close', requireAdminAuth, (req, res) => {
   setVotingState(false);
   io.emit('voting-toggle', false);
   res.json({ success: true   
@@ -434,6 +441,14 @@ AuditCommittee.hasMany(AuditVote, { foreignKey: 'AuditCommitteeId' });
 AuditVote.belongsTo(AuditCommittee, { foreignKey: 'AuditCommitteeId' });
 AuditVote.belongsTo(RegisteredUser, { foreignKey: 'voterId' });
 RegisteredUser.hasMany(AuditVote, { foreignKey: 'voterId' });
+// Admin model
+const Admin = sequelize.define('Admin', {
+  id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
+  username: { type: Sequelize.STRING, allowNull: false, unique: true },
+  passwordHash: { type: Sequelize.STRING, allowNull: false },
+  isSuperAdmin: { type: Sequelize.BOOLEAN, defaultValue: false }
+});
+
 // Sync database
 sequelize.sync().then(() => {
   console.log('Database & tables created!');
@@ -467,7 +482,7 @@ app.use(cors({
 // Routes
 
 // Admin ends AGM and thanks shareholders
-app.post('/api/admin/agm/end', (req, res) => {
+app.post('/api/admin/agm/end', requireAdminAuth, (req, res) => {
   io.emit('agm-finished', {
     message: 'Thank you for participating in the AGM. Voting has now closed.'
   });
@@ -580,7 +595,7 @@ app.post('/api/login',   async (req, res) => {
 // Expects JSON body with at minimum { name, acno }
 // Optional: holdings, chn, email, phone_number
 // ---------------------------------------------------
-app.post('/api/admin/registered-users', async (req, res) => {
+app.post('/api/admin/registered-users', requireAdminAuth, async (req, res) => {
   try {
     const { name, acno, holdings = 0, chn, email, phone_number } = req.body;
 
@@ -677,7 +692,7 @@ app.get('/api/admin/voting/state', (req, res) => {
 });
 
 // Add this to your server.js file
-app.put('/api/admin/audit-committee/:id/activate', async (req, res) => {
+app.put('/api/admin/audit-committee/:id/activate', requireAdminAuth, async (req, res) => {
   try {
     // Start a transaction
     const transaction = await sequelize.transaction();
@@ -714,7 +729,7 @@ app.put('/api/admin/audit-committee/:id/activate', async (req, res) => {
   }
 });
 
-app.put('/api/admin/resolutions/:id/activate', async (req, res) => {
+app.put('/api/admin/resolutions/:id/activate', requireAdminAuth, async (req, res) => {
   try {
     // Deactivate all other resolutions and audit members
     await Resolution.update({ isActive: false }, { where: {} });
@@ -762,7 +777,7 @@ app.put('/api/admin/resolutions/:id/activate', async (req, res) => {
 
 
 // Add to server.js
-app.put('/api/admin/resolutions/:id/proxy', async (req, res) => {
+app.put('/api/admin/resolutions/:id/proxy', requireAdminAuth, async (req, res) => {
   try {
     const { proxyVotes } = req.body;
     
@@ -818,7 +833,7 @@ app.get('/api/voting/resolutions', async (req, res) => {
 });
 
 // server.js - Updated resolution endpoint
-app.post('/api/admin/resolutions', async (req, res) => {
+app.post('/api/admin/resolutions', requireAdminAuth, async (req, res) => {
   // Add basic validation
   if (!req.body.title || !req.body.description) {
     return res.status(400).json({ 
@@ -854,7 +869,7 @@ app.post('/api/admin/resolutions', async (req, res) => {
   
 });
 // PUT - Update resolution
-app.put('/api/resolutions/:id', async (req, res) => {
+app.put('/api/resolutions/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const resolution = await Resolution.findByPk(id);
@@ -871,7 +886,7 @@ app.put('/api/resolutions/:id', async (req, res) => {
 });
 
 // DELETE - Remove resolution
-app.delete('/api/resolutions/:id', async (req, res) => {
+app.delete('/api/resolutions/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const resolution = await Resolution.findByPk(id);
@@ -1125,7 +1140,7 @@ app.get('/resolutions', async (req, res) => {
 // Close current resolution
 
 // Close Resolution
-app.post('/api/admin/resolutions/close', async (req, res) => {
+app.post('/api/admin/resolutions/close', requireAdminAuth, async (req, res) => {
   try {
     await Resolution.update({ isActive: false }, { where: { isActive: true }   
 });
@@ -1429,7 +1444,7 @@ app.get('/api/audit-committee', async (req, res) => {
 });
 
 // Create new audit committee member
-app.post('/api/audit-committee', async (req, res) => {
+app.post('/api/audit-committee', requireAdminAuth, async (req, res) => {
   try {
     const { name, bio } = req.body;
     const member = await AuditCommittee.create({ name, bio });
@@ -1442,7 +1457,7 @@ app.post('/api/audit-committee', async (req, res) => {
 
 // Update audit committee member
 // Update audit committee member
-app.put('/api/audit-committee/:id',async (req, res) => {
+app.put('/api/audit-committee/:id', requireAdminAuth, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
@@ -1481,7 +1496,7 @@ app.put('/api/audit-committee/:id',async (req, res) => {
 });
 
 // Delete audit committee member
-app.delete('/api/audit-committee/:id',  async (req, res) => {
+app.delete('/api/audit-committee/:id', requireAdminAuth, async (req, res) => {
   const transaction = await sequelize.transaction();
   
   try {
@@ -1722,6 +1737,89 @@ app.get('/api/check-audit-vote', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to check audit vote status' });
   }
 });
+
+// ── Admin Auth ──────────────────────────────────────────────────────────────
+
+// POST /api/super-admin — one-time setup protected by SETUP_SECRET env var
+app.post('/api/super-admin', async (req, res) => {
+  const { secret, username, password } = req.body;
+  if (!process.env.SETUP_SECRET || secret !== process.env.SETUP_SECRET) {
+    return res.status(403).json({ error: 'Invalid setup secret' });
+  }
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
+  }
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const admin = await Admin.create({ username, passwordHash, isSuperAdmin: true });
+    res.status(201).json({ success: true, id: admin.id, username: admin.username });
+  } catch (err) {
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    console.error('Super admin creation error:', err);
+    res.status(500).json({ error: 'Failed to create super admin' });
+  }
+});
+
+// POST /api/admin/auth/login
+app.post('/api/admin/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  try {
+    const admin = await Admin.findOne({ where: { username } });
+    if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
+    const match = await bcrypt.compare(password, admin.passwordHash);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    req.session.adminId = admin.id;
+    req.session.adminUsername = admin.username;
+    req.session.save((err) => {
+      if (err) return res.status(500).json({ error: 'Login failed' });
+      res.json({ success: true, username: admin.username });
+    });
+  } catch (err) {
+    console.error('Admin login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// POST /api/admin/auth/logout
+app.post('/api/admin/auth/logout', (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
+
+// GET /api/admin/auth/me
+app.get('/api/admin/auth/me', (req, res) => {
+  if (!req.session?.adminId) return res.status(401).json({ authenticated: false });
+  res.json({ authenticated: true, username: req.session.adminUsername });
+});
+
+// Deactivate all audit committee members
+app.post('/api/admin/audit-committee/deactivate-all', requireAdminAuth, async (req, res) => {
+  try {
+    await AuditCommittee.update({ isActive: false }, { where: {} });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to deactivate all' });
+  }
+});
+
+// Deactivate a single audit committee member
+app.put('/api/admin/audit-committee/:id/deactivate', requireAdminAuth, async (req, res) => {
+  try {
+    const member = await AuditCommittee.findByPk(req.params.id);
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    await member.update({ isActive: false });
+    io.emit('audit-member-updated', member);
+    res.json(member);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to deactivate member' });
+  }
+});
+
+// ── End Admin Auth ───────────────────────────────────────────────────────────
 
 // Start the server
 const PORT = process.env.PORT || 3000;
