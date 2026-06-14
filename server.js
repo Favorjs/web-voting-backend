@@ -1822,6 +1822,44 @@ app.put('/api/admin/audit-committee/:id/deactivate', requireAdminAuth, async (re
   }
 });
 
+// ── Clear Votes ──────────────────────────────────────────────────────────────
+
+app.delete('/api/admin/votes/resolutions', requireAdminAuth, async (req, res) => {
+  try {
+    await Vote.destroy({ where: {} });
+    io.emit('votes-cleared', { type: 'resolutions' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Clear resolution votes error:', err);
+    res.status(500).json({ error: 'Failed to clear resolution votes' });
+  }
+});
+
+app.delete('/api/admin/votes/audit', requireAdminAuth, async (req, res) => {
+  try {
+    await AuditVote.destroy({ where: {} });
+    await AuditCommittee.update({ votesFor: 0 }, { where: {} });
+    io.emit('votes-cleared', { type: 'audit' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Clear audit votes error:', err);
+    res.status(500).json({ error: 'Failed to clear audit votes' });
+  }
+});
+
+app.delete('/api/admin/votes/all', requireAdminAuth, async (req, res) => {
+  try {
+    await Vote.destroy({ where: {} });
+    await AuditVote.destroy({ where: {} });
+    await AuditCommittee.update({ votesFor: 0 }, { where: {} });
+    io.emit('votes-cleared', { type: 'all' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Clear all votes error:', err);
+    res.status(500).json({ error: 'Failed to clear all votes' });
+  }
+});
+
 // ── Proxy Settings ───────────────────────────────────────────────────────────
 
 // GET /api/proxy-settings — public, used by results page
