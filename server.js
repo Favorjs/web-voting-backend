@@ -1826,9 +1826,24 @@ app.put('/api/admin/audit-committee/:id/deactivate', requireAdminAuth, async (re
 
 app.get('/api/admin/voters', requireAdminAuth, async (req, res) => {
   try {
-    const voters = await RegisteredUser.findAll({ order: [['createdAt', 'DESC']] });
+    const voters = await RegisteredUser.findAll({
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(SELECT COUNT(*) FROM "Votes" WHERE "Votes"."registereduserId" = "registeredusers"."id")`),
+            'resolutionVoteCount'
+          ],
+          [
+            sequelize.literal(`(SELECT COUNT(*) FROM "AuditVotes" WHERE "AuditVotes"."voterId" = "registeredusers"."id")`),
+            'auditVoteCount'
+          ]
+        ]
+      },
+      order: [[sequelize.literal('"holdings"'), 'DESC NULLS LAST']]
+    });
     res.json(voters);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Failed to fetch voters' });
   }
 });
