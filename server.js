@@ -42,7 +42,7 @@ const requireAuth = (req, res, next) => {
       
 });
   }
-  next();
+  next(); 
 };
 
 const requireAdminAuth = (req, res, next) => {
@@ -1819,6 +1819,43 @@ app.put('/api/admin/audit-committee/:id/deactivate', requireAdminAuth, async (re
     res.json(member);
   } catch (err) {
     res.status(500).json({ error: 'Failed to deactivate member' });
+  }
+});
+
+// ── Voters / Registered Users ────────────────────────────────────────────────
+
+app.get('/api/admin/voters', requireAdminAuth, async (req, res) => {
+  try {
+    const voters = await RegisteredUser.findAll({ order: [['createdAt', 'DESC']] });
+    res.json(voters);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch voters' });
+  }
+});
+
+app.delete('/api/admin/voters/:id', requireAdminAuth, async (req, res) => {
+  try {
+    const voter = await RegisteredUser.findByPk(req.params.id);
+    if (!voter) return res.status(404).json({ error: 'Voter not found' });
+    await Vote.destroy({ where: { registereduserId: voter.id } });
+    await AuditVote.destroy({ where: { voterId: voter.id } });
+    await voter.destroy();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete voter' });
+  }
+});
+
+app.get('/api/admin/stats', requireAdminAuth, async (req, res) => {
+  try {
+    const [totalVoters, resolutionVotes, auditVotes] = await Promise.all([
+      RegisteredUser.count(),
+      Vote.count(),
+      AuditVote.count()
+    ]);
+    res.json({ totalVoters, resolutionVotes, auditVotes });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 
