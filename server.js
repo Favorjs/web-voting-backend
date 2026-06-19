@@ -348,12 +348,27 @@ const broadcastResolutionUpdate = async () => {
 
 let votingState = {
   isOpen: false,
-  type: null, // 'resolution' or 'audit'
-  activeId: null
+  type: null,
+  activeId: null,
+  startedAt: null,
+  duration: 60
 };
 
-const setVotingState = (isOpen, type, activeId) => {
-  votingState = { isOpen, type, activeId };
+const getSettingNum = async (key, defaultVal) => {
+  try {
+    const s = await Setting.findByPk(key);
+    return s ? Number(s.value) : defaultVal;
+  } catch (e) { return defaultVal; }
+};
+
+const setVotingState = async (isOpen, type = null, activeId = null) => {
+  let duration = votingState.duration;
+  let startedAt = null;
+  if (isOpen) {
+    duration = await getSettingNum('votingDuration', 60);
+    startedAt = Date.now();
+  }
+  votingState = { isOpen, type, activeId, startedAt, duration };
   io.emit('voting-state', votingState);
 };
 
@@ -362,13 +377,9 @@ app.get('/api/voting-state', (req, res) => {
   res.json(votingState);
 });
 
-
-app.post('/api/admin/voting/open', requireAdminAuth, (req, res) => {
-  setVotingState(true);
-  io.emit('voting-toggle', true);
-  res.json({ success: true   
-});
-  
+app.post('/api/admin/voting/open', requireAdminAuth, async (req, res) => {
+  await setVotingState(true);
+  res.json({ success: true });
 });
 
 // Get current voting state
@@ -377,22 +388,32 @@ app.get('/api/admin/voting/state', (req, res) => {
 });
 
 // Toggle voting state and broadcast to clients
-app.post('/api/admin/voting/toggle', requireAdminAuth, (req, res) => {
+app.post('/api/admin/voting/toggle', requireAdminAuth, async (req, res) => {
   const { type, activeId } = req.body;
   if (!type || !activeId) {
     return res.status(400).json({ error: 'type and activeId required' });
   }
   const newState = !votingState.isOpen;
-  setVotingState(newState, type, activeId);
+  await setVotingState(newState, type, activeId);
   return res.json(votingState);
 });
 
-app.post('/api/admin/voting/close', requireAdminAuth, (req, res) => {
-  setVotingState(false);
-  io.emit('voting-toggle', false);
-  res.json({ success: true   
+app.post('/api/admin/voting/close', requireAdminAuth, async (req, res) => {
+  await setVotingState(false);
+  res.json({ success: true });
 });
-  
+
+// Voting duration setting
+app.get('/api/admin/voting-duration', requireAdminAuth, async (req, res) => {
+  res.json({ duration: await getSettingNum('votingDuration', 60) });
+});
+
+app.put('/api/admin/voting-duration', requireAdminAuth, async (req, res) => {
+  const { duration } = req.body;
+  const val = Math.max(10, Math.min(3600, Number(duration) || 60));
+  await Setting.upsert({ key: 'votingDuration', value: String(val) });
+  votingState = { ...votingState, duration: val };
+  res.json({ duration: val });
 });
 
 
