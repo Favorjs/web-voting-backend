@@ -362,13 +362,16 @@ const getSettingNum = async (key, defaultVal) => {
 };
 
 const setVotingState = async (isOpen, type = null, activeId = null) => {
-  let duration = votingState.duration;
+  let duration = votingState.duration || 60;
   let startedAt = null;
+  let sessionKey = votingState.sessionKey || 0;
   if (isOpen) {
     duration = await getSettingNum('votingDuration', 60);
+    if (!duration || duration < 10 || duration > 3600) duration = 60;
     startedAt = Date.now();
+    sessionKey = sessionKey + 1; // unique key per voting session
   }
-  votingState = { isOpen, type, activeId, startedAt, duration };
+  votingState = { isOpen, type, activeId, startedAt, duration, sessionKey };
   io.emit('voting-state', votingState);
 };
 
@@ -730,8 +733,7 @@ app.put('/api/admin/audit-committee/:id/activate', requireAdminAuth, async (req,
     // Commit the transaction
     await transaction.commit();
     
-    // Set voting state (if needed)
-    setVotingState(false, 'audit', member.id);
+    await setVotingState(false, 'audit', member.id);
     
     // Broadcast updates
     io.emit('audit-member-updated', member);
@@ -754,8 +756,7 @@ app.put('/api/admin/resolutions/:id/activate', requireAdminAuth, async (req, res
     const resolution = await Resolution.findByPk(req.params.id);
     await resolution.update({ isActive: true });
     
-    // Set voting state
-    setVotingState(false, 'resolution', resolution.id);
+    await setVotingState(false, 'resolution', resolution.id);
     
     // Broadcast updates
     io.emit('resolution-update', resolution);
@@ -1159,11 +1160,10 @@ app.post('/api/admin/resolutions/close', requireAdminAuth, async (req, res) => {
   try {
     await Resolution.update({ isActive: false }, { where: { isActive: true }   
 });
-    votingState = false; // Also close voting when resolution closes
-    
+    await setVotingState(false); // properly close voting
+
     // Broadcast updates
     io.emit('resolution-closed');
-    io.emit('voting-state', false);
     
     res.json({ success: true   
 });
@@ -1230,36 +1230,7 @@ app.get('/api/active-resolution', async (req, res) => {
   }
 });
 
-//Toggle Voting State
-app.post('/api/admin/voting/toggle', async (req, res) => {
-  try {
-    const { type, activeId } = req.body;
-    
-    if (votingState.isOpen) {
-      // Close voting
-      setVotingState(false, null, null);
-    } else {
-      // Open voting - validate there's an active item
-      if (type === 'resolution') {
-        const resolution = await Resolution.findByPk(activeId);
-        if (!resolution) {
-          return res.status(400).json({ error: 'Resolution not found' });
-        }
-      } else if (type === 'audit') {
-        const member = await AuditCommittee.findByPk(activeId);
-        if (!member) {
-          return res.status(400).json({ error: 'Committee member not found' });
-        }
-      }
-      
-      setVotingState(true, type, activeId);
-    }
-    
-    res.json(votingState);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to toggle voting' });
-  }
-});
+// (duplicate toggle route removed — handled above at /api/admin/voting/toggle)
 
 // Get active resolution
 
